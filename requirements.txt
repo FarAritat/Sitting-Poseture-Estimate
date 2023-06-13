@@ -1,7 +1,6 @@
-av==10.0.0
 fastai==2.7.12
-mediapipe==0.9.0.1
-numpy==1.21.6
+mediapipe==0.10.1
+numpy==1.24.3
 opencv_contrib_python==4.7.0.72
 opencv_python==4.7.0.72
 streamlit==1.23.1

@@ -7,15 +7,10 @@ import os
 import streamlit as st
 import numpy as np
 import cv2
-from pathlib import Path
 import urllib.request
 import pathlib
 import mediapipe as mp
-import time
 
-# For online hosting
-from streamlit_webrtc import webrtc_streamer
-import av
 
 # Change PosixPath when os system is window
 # st.write(sys.platform)
@@ -28,7 +23,6 @@ mpDraw = mp.solutions.drawing_utils
 mpPose = mp.solutions.pose
 mp_selfie_segmentation = mp.solutions.selfie_segmentation
 pose = mpPose.Pose()
-isLocalhost = False
 
 # python -m streamlit run app.py
 FRAME_WINDOW = st.image([])
@@ -54,7 +48,6 @@ SEGMENT_MODEL = mp_selfie_segmentation.SelfieSegmentation(model_selection=0)
 
 
 def predict(learn, img):
-    time.sleep(1)
     pred, pred_idx, pred_prob = learn.predict(img)
     if pred == '00':
         return "00", pred_prob[pred_idx]*100
@@ -89,13 +82,6 @@ def segment_out(image, segment_model, bg_color):
     output_image = np.where(condition, image, bg_image)
     return output_image
 
-
-def process4webcam(image):
-    # Flip horizontally
-    image = cv2.flip(image, 1)
-    return image
-
-
 def predict_from_segment(segment_image, learn_inf):
     
     result = predict(learn_inf, segment_image)
@@ -114,82 +100,51 @@ def predict_from_segment(segment_image, learn_inf):
 
     return output_message, output_type
 
+def get_image_from_upload():
+    uploaded_file = st.file_uploader("Upload Files",type=['png','jpeg', 'jpg'])
+    if uploaded_file is not None:
+        st.image(PILImage.create((uploaded_file)))
+        return PILImage.create((uploaded_file))
+    return None
 
-def callback(frame: av.VideoFrame) -> av.VideoFrame:
-    # 24 bit -> 8 bit for each channel
-    frame = frame.to_ndarray(format="bgr24")
-    frame = process4webcam(frame)
-    frame = segment_out(frame,
-                        SEGMENT_MODEL,
-                        bg_color=(192, 192, 192)
-                        )
-
-    output_message, output_type = predict_from_segment(frame, learn_inf)
-
-    if output_type == "success":
-        bgr_color = (0, 255, 0)
-
-    elif output_type == "warning":
-        bgr_color = (0, 255, 255)
-
-    elif output_type == "error":
-        bgr_color = (0, 0, 255)
-
-    frame = cv2.putText(
-        frame,
-        output_message,
-        org=(20, 20),
-        fontFace=cv2.FONT_HERSHEY_DUPLEX,
-        fontScale=0.5,
-        color=bgr_color,
-        thickness=1)
-
-    # frame = cv2.resize(frame, (224, 224))
-    return av.VideoFrame.from_ndarray(frame, format="bgr24")
-
-def cam_button():
-    global num_cam
-    st.sidebar.title('Switch camera')
-    num_cam = st.sidebar.radio("Select camera", ["Swicth to Camera 1", "Swicth to Camera 2"])
-    if num_cam=='Swicth to Camera 1':
-       num_cam=0
-    else:
-       num_cam=1  
+def take_a_picture():
+    picture = st.camera_input("Take a picture")
+    if picture:
+        #st.image(picture)
+        return PILImage.create((picture)) 
+    return None
 
 def main():
-    if isLocalhost:
-        cam_button()
-        cap = cv2.VideoCapture(num_cam)
-        cap.set(3, 224)
-        cap.set(4, 224)
-        while True:
-            ret, frame = cap.read()
-            # If camera cannot open
-            if not ret:
-                output_placeholder.error("Cannot open camera")
-                continue
-            frame = process4webcam(frame)
-            output_placeholder2.image(frame, channels="RGB")
-            output = segment_out(frame,
-                                 SEGMENT_MODEL,
-                                 bg_color=(192, 192, 192)
-                                 )
-            # Render image
-            output_placeholder.image(output, channels="RGB")
-
-            output_message, output_type = predict_from_segment(
-                output, learn_inf)
-            if output_type == "success":
-                pred_placeholder.success(output_message)
-
-            elif output_type == "warning":
-                pred_placeholder.warning(output_message)
-
-            elif output_type == "error":
-                pred_placeholder.error(output_message)
+    st.sidebar.title('Options')
+    datasrc = st.sidebar.radio("Select input source.", ["Uploaded file", "Take a picture"])
+    if datasrc == "Uploaded file": 
+        frame = get_image_from_upload()
     else:
-        webrtc_streamer(key="sample", video_frame_callback=callback)
+        frame = take_a_picture()
+    result = st.button('Classify')
+    if result:
+        frame=np.array(frame)
+        #st.write(frame)
+        output_placeholder2.image(frame, channels="RGB")
+        output = segment_out(frame,
+                                SEGMENT_MODEL,
+                                bg_color=(192, 192, 192)
+                                )
+        predict(learn_inf, frame)
+        # Render image
+        output_placeholder.image(output, channels="RGB")
 
+        output_message, output_type = predict_from_segment(
+            output, learn_inf)
+
+        if output_type == "success":
+            pred_placeholder.success(output_message)
+
+        elif output_type == "warning":
+            pred_placeholder.warning(output_message)
+
+        elif output_type == "error":
+            pred_placeholder.error(output_message)
 
 if __name__ == '__main__':
     main()
