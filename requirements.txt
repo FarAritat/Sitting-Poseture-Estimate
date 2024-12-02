@@ -1,5 +1,5 @@
 fastai==2.7.12
-mediapipe==0.9.0.1
+mediapipe==0.10.0
 numpy==1.21.6
 opencv_contrib_python==4.7.0.72
 opencv_python==4.7.0.72
